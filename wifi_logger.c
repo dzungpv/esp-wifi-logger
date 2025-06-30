@@ -137,12 +137,25 @@ void generate_log_message(esp_log_level_t level, const char *TAG, int line, cons
 
 int system_log_message_route(const char* fmt, va_list tag)
 {
-	char *log_print_buffer = (char*) malloc(sizeof(char) * BUFFER_SIZE);
-	vsprintf(log_print_buffer, fmt, tag);
+    char *log_print_buffer = (char*) malloc(sizeof(char) * BUFFER_SIZE);
+    // Check if malloc failed.
+    if (log_print_buffer == NULL) {
+        // Cannot allocate memory, so we can't create the log_print_buffer to send_to_queue
+        // Simply just fall back to normal logging.
+        return vprintf(fmt, tag);
+    }
 
-	send_to_queue(log_print_buffer);
+    va_list tag_copy;
+    va_copy(tag_copy, tag);  // Create a copy of the va_list to prevent using empty one
 
-	return vprintf(fmt, tag);
+    vsnprintf(log_print_buffer, BUFFER_SIZE, fmt, tag);
+    send_to_queue(log_print_buffer);
+
+    int result = vprintf(fmt, tag_copy);  // Use the copy
+
+    va_end(tag_copy);  // Clean up the copy
+
+    return result;
 }
 
 void start_wifi_logger(void)
